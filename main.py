@@ -72,7 +72,11 @@ async def roll_pattern(message: Message, command: CommandObject, line_prefix: st
                 if (db.is_magic_roll(message.from_user.username, dice)):
                     print("magic!")
                     mn, mx = db.get_magic_min_max(message.from_user.username, dice)
-                    result.append(func(mn, mx))
+                    if mn > mx:
+                        swap(mn, mx)
+                    act_mn = min(max(1, mn), dice)
+                    act_mx = max(min(dice, mx), 1)
+                    result.append(func(act_mn, act_mx))
                     db.decrease_magic_rolls(message.from_user.username, dice)
                 else:
                     print("no magic :(")
