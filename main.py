@@ -8,6 +8,8 @@ import random
 import pytz
 import string
 
+#aboba
+
 from db import DataBase
 
 from aiogram import Bot, Dispatcher, types
