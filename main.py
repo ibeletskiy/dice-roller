@@ -5,6 +5,7 @@ import logging
 import sys
 import os
 import random
+import re
 import pytz
 import string
 
@@ -31,8 +32,34 @@ db = DataBase()
 scheduler = AsyncIOScheduler(timezone=pytz.utc)
 
 def get_dices(text: str):
-    dice, count = list(map(int, text.split()))
-    return [[dice, count]]
+    dices = []
+    text = text.replace(' ', '')
+    print(text)
+    if text[0] != '+' and text[0] != '-':
+        text = "+" + text
+    tokens = re.split(r'[+\-]', text)
+    if len(tokens[0]) == 0:
+        tokens = tokens[1:]
+    pos = 0
+    for token in tokens:
+        if len(token) == 0:
+            raise("Invalid roll format")
+        multiplier = 1
+        if text[pos] == '-':
+            multiplier = -1
+        if token.isnumeric():
+            count, dice = int(token), 1
+        elif token[0] not in "dDдД":
+            count, dice = list(map(int, re.split(r'[dDдД]', token)))
+        else:
+            count, dice = 1, int(token[1:])
+
+        count *= multiplier
+        dices.append([dice, count])
+
+        pos += len(token) + 1
+
+    return dices
 
 async def delete_message(message: Message, bot_message: Message):
     try:
@@ -57,33 +84,41 @@ async def command_start_handler(message: Message):
     await reply(message, "Welcome to DnD Dice Roller Bot!")
 
 async def roll_pattern(message: Message, command: CommandObject, line_prefix: str, func):
+    sign = lambda x: -1 if x < 0 else 1 if x > 0 else 0 
     db.add_user(message.from_user.username)
     try:
         dices = get_dices(command.args)
         text = ""
         total_sum = 0
-        for dice, count in dices:
+        if len(dices) > 100:
+            await reply(message, "Go fuck yourself ❤️") # ibeletskiy really should rewrite it
+            return
+
+        for dice, signed_count in dices:
+            count = abs(signed_count)
             if count > 100 or dice > 100 or dice <= 0:
                 await reply(message, "Go fuck yourself ❤️")
                 return
-
-            result = []
-            for i in range(count):
-                if (db.is_magic_roll(message.from_user.username, dice)):
-                    print("magic!")
-                    mn, mx = db.get_magic_min_max(message.from_user.username, dice)
-                    if mn > mx:
-                        swap(mn, mx)
-                    act_mn = min(max(1, mn), dice)
-                    act_mx = max(min(dice, mx), 1)
-                    result.append(func(act_mn, act_mx))
-                    db.decrease_magic_rolls(message.from_user.username, dice)
-                else:
-                    print("no magic :(")
-                    result.append(func(1, dice))
-            print(f"result is {result}")
-            text += f"{line_prefix}{count}d{dice}: {", ".join(list(map(str, result)))} = {sum(result)}\n"
-            total_sum += sum(result)
+            if dice != 1:
+                result = []
+                for i in range(count):
+                    if (db.is_magic_roll(message.from_user.username, dice)):
+                        print("magic!")
+                        mn, mx = db.get_magic_min_max(message.from_user.username, dice)
+                        if mn > mx:
+                            swap(mn, mx)
+                        act_mn = min(max(1, mn), dice)
+                        act_mx = max(min(dice, mx), 1)
+                        result.append(func(act_mn, act_mx))
+                        db.decrease_magic_rolls(message.from_user.username, dice)
+                    else:
+                        print("no magic :(")
+                        result.append(func(1, dice))
+                print(f"result is {result}")
+                text += f"{line_prefix}{count}d{dice}: {", ".join(list(map(str, result)))} = {sign(signed_count) * sum(result)}\n"
+            else:
+                text += f"{signed_count}\n"
+            total_sum += sign(signed_count) * sum(result)
 
         if len(dices) != 1:
             text += "_____________________________________\n"
