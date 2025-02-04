@@ -1,6 +1,6 @@
 import sqlite3
 
-PATH = '/home/ibeletskiy/rollerDiceBot/dnd_bot.db'
+PATH = '/home/ibeletskiy/dice-roller/dnd_bot.db'
 
 class DataBase:
 
