@@ -99,8 +99,8 @@ async def roll_pattern(message: Message, command: CommandObject, line_prefix: st
             if count > 100 or dice > 100 or dice <= 0:
                 await reply(message, "Go fuck yourself ❤️")
                 return
+            result = []
             if dice != 1:
-                result = []
                 for i in range(count):
                     if (db.is_magic_roll(message.from_user.username, dice)):
                         print("magic!")
@@ -117,6 +117,7 @@ async def roll_pattern(message: Message, command: CommandObject, line_prefix: st
                 print(f"result is {result}")
                 text += f"{line_prefix}{count}d{dice}: {", ".join(list(map(str, result)))} = {sign(signed_count) * sum(result)}\n"
             else:
+                result.append(count)
                 text += f"{signed_count}\n"
             total_sum += sign(signed_count) * sum(result)
 
