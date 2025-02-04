@@ -122,7 +122,7 @@ async def roll_pattern(message: Message, command: CommandObject, line_prefix: st
             total_sum += sign(signed_count) * sum(result)
 
         if len(dices) != 1:
-            text += "_____________________________________\n"
+            text += "_______________________________\n"
             text += f"Total sum = {total_sum}"
         await reply(message, text)
     except Exception as e:
