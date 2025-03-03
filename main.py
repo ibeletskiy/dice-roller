@@ -49,8 +49,8 @@ def get_dices(text: str):
             multiplier = -1
         if token.isnumeric():
             count, dice = int(token), 1
-        elif token[0] not in "dDдД":
-            count, dice = list(map(int, re.split(r'[dDдД]', token)))
+        elif token[0] not in "dDдДkKкК":
+            count, dice = list(map(int, re.split(r'[dDдДkKкК]', token)))
         else:
             count, dice = 1, int(token[1:])
 
