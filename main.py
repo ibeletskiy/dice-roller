@@ -132,7 +132,7 @@ async def inline_pattern(inline_query: InlineQuery):
             db.add_user(username, user_id)
             text = roll_text(username, args)
         except Exception:
-            text = "Use format another format"
+            text = "An error occured. Use another format"
         input_content = InputTextMessageContent(message_text=text)
         if query.lower().startswith("roll_h"):
             input_content = InputTextMessageContent(message_text=f'<span class="tg-spoiler">{text}</span>', parse_mode="HTML")
@@ -158,6 +158,22 @@ async def reply_pattern(message: Message, command: CommandObject, line_prefix: s
     except Exception as e:
         await reply(message, f"An error occurred. Please make sure you provided the details in the correct format")
         print(e)
+
+async def hidden_pattern(message: Message, command: CommandObject, line_prefix: str, func):
+    db.add_user(message.from_user.username, message.from_user.id)
+    try:
+        target_name = command.args.split()[0]
+        args = command.args[len(target_name):]
+        text = roll_text(message.from_user.username, args, line_prefix, func)
+        await bot.send_message(chat_id=db.get_user_id(target_name),
+                               text=f"from {message.from_user.username}:\n{text}")
+    except Exception as e:
+        await reply(message, f"An error occurred. Please make sure you provided the details in the correct format")
+        print(e)
+
+@dp.message(Command("roll_h"))
+async def roll_h_handler(message: Message, command: CommandObject):
+    await hidden_pattern(message, command, "", lambda mn, mx: randint(mn, mx))
 
 @dp.message(Command("roll"))
 async def roll_handler(message: Message, command: CommandObject):
