@@ -56,7 +56,7 @@ async def help_handler(message: Message):
 """
 
     full_help = base_help
-    if username in MAGIC_HANDLERS:
+    if username in MAGIC_HANDLERS and message.chat.type == "private":
         full_help += magic_help
 
     await reply(message, full_help.strip())
