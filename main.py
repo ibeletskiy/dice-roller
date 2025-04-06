@@ -32,6 +32,36 @@ db = DataBase()
 
 scheduler = AsyncIOScheduler(timezone=pytz.utc)
 
+@dp.message(Command("help"))
+async def help_handler(message: Message):
+    username = message.from_user.username
+    db.add_user(username, message.from_user.id)
+
+    base_help = """
+<b>🎲 Основные команды:</b>
+/roll &lt;формула&gt; — бросить кубики (например, <i>/roll 2d6+1</i>)
+/roll_a &lt;формула&gt; — бросок с преимуществом
+/roll_d &lt;формула&gt; — бросок с помехой 
+/roll_h &lt;user&gt; &lt;формула&gt; — скрытый бросок
+/set_delete_time &lt;секунды&gt; — установить время удаления
+/help — показать эту справку
+"""
+
+    magic_help = """
+\n\n<b>🧙 Магия:</b>
+/magic_set_dice &lt;user&gt; &lt;dice&gt; &lt;min&gt; &lt;max&gt; &lt;count&gt; — задать магию пользователю
+/magic_clear &lt;user&gt; dice1 dice2 ... — очистить магические кости
+/give_me_magic &lt;ключ&gt; — получить временный доступ к магии
+/magic_keys [время] — сгенерировать ключ на время
+"""
+
+    full_help = base_help
+    if username in MAGIC_HANDLERS:
+        full_help += magic_help
+
+    await reply(message, full_help.strip())
+
+
 def get_dices(text: str):
     dices = []
     text = text.replace(' ', '')
