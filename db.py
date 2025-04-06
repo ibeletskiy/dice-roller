@@ -1,6 +1,7 @@
 import sqlite3
 
-PATH = '/home/ibeletskiy/dice-roller/dnd_bot.db'
+#PATH = '/home/ibeletskiy/dice-roller/dnd_bot.db'
+PATH = '/Users/iabeletsky/Programming/dice-roller/dnd_bot.db'
 
 class DataBase:
 
@@ -9,6 +10,7 @@ class DataBase:
         c = conn.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
+            user_id INTEGER,
             delete_time INTEGER DEFAULT 60,
             is_master BIT DEFAULT 0
         )''')
@@ -31,10 +33,10 @@ class DataBase:
         conn.commit()
         conn.close()
 
-    def add_user(self, username):
+    def add_user(self, username, user_id):
         conn = sqlite3.connect(PATH)
         c = conn.cursor()
-        c.execute("INSERT OR IGNORE INTO users (username, delete_time) VALUES (?, ?)", (username, 60))
+        c.execute("INSERT OR IGNORE INTO users (username, user_id, delete_time) VALUES (?, ?, ?)", (username, user_id, 60))
         c.execute("INSERT OR IGNORE INTO magic (username, magic_used) VALUES (?, ?)", (username, 0))
         conn.commit()
         conn.close()
@@ -68,6 +70,14 @@ class DataBase:
         time = c.fetchone()
         conn.close()
         return time[0] if time else 60
+
+    def get_user_id(self, username):
+        conn = sqlite3.connect(PATH)
+        c = conn.cursor()
+        c.execute("SELECT user_id FROM users WHERE username = ?", (username,))
+        uid = c.fetchone()
+        conn.close()
+        return uid[0] if uid else None
 
     def add_password(self, password, time):
         conn = sqlite3.connect(PATH)

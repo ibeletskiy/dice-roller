@@ -14,6 +14,7 @@ from db import DataBase
 from aiogram import Bot, Dispatcher, types
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command, CommandObject
+from aiogram.types import InlineQuery, InlineQueryResultArticle, InputTextMessageContent
 from aiogram.client.default import DefaultBotProperties
 from aiogram.types import Message
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -34,7 +35,6 @@ scheduler = AsyncIOScheduler(timezone=pytz.utc)
 def get_dices(text: str):
     dices = []
     text = text.replace(' ', '')
-    print(text)
     if text[0] != '+' and text[0] != '-':
         text = "+" + text
     tokens = re.split(r'[+\-]', text)
@@ -80,50 +80,80 @@ async def reply(message: Message, text: str):
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message):
-    db.add_user(message.from_user.username)
+    db.add_user(message.from_user.username, message.from_user.id)
     await reply(message, "Welcome to DnD Dice Roller Bot!")
 
-async def roll_pattern(message: Message, command: CommandObject, line_prefix: str, func):
+def roll_text(username: str, args: str, line_prefix: str = "", func=lambda mn, mx: randint(mn, mx)):
     sign = lambda x: -1 if x < 0 else 1 if x > 0 else 0 
-    db.add_user(message.from_user.username)
+    dices = get_dices(args)
+    text = ""
+    total_sum = 0
+    if len(dices) > 100:
+        return "Go fuck yourself ❤️"
+
+    for dice, signed_count in dices:
+        count = abs(signed_count)
+        if count > 100 or dice > 100 or dice <= 0:
+            return "Go fuck yourself ❤️" #it still needs to be rewrited 
+        result = []
+        if dice != 1:
+            for i in range(count):
+                if (db.is_magic_roll(username, dice)):
+                    mn, mx = db.get_magic_min_max(username, dice)
+                    if mn > mx:
+                        swap(mn, mx)
+                    act_mn = min(max(1, mn), dice)
+                    act_mx = max(min(dice, mx), 1)
+                    result.append(func(act_mn, act_mx))
+                    db.decrease_magic_rolls(username, dice)
+                else:
+                    result.append(func(1, dice))
+            text += f"{line_prefix}{count}d{dice}: {", ".join(list(map(str, result)))} = {sign(signed_count) * sum(result)}\n"
+        else:
+            result.append(count)
+            text += f"{signed_count}\n"
+        total_sum += sign(signed_count) * sum(result)
+
+    if len(dices) != 1:
+        text += "_______________________________\n"
+        text += f"Total sum = {total_sum}"
+
+    return text
+
+@dp.inline_query()
+async def inline_pattern(inline_query: InlineQuery):
+    query = inline_query.query.strip()
+
+    if query.lower().startswith("roll"):
+        try:
+            args = query[len(query.split()[0]):].strip()
+            username = inline_query.from_user.username or "unkown_user"
+            user_id = inline_query.from_user.id
+            db.add_user(username, user_id)
+            text = roll_text(username, args)
+        except Exception:
+            text = "Use format another format"
+        input_content = InputTextMessageContent(message_text=text)
+        if query.lower().startswith("roll_h"):
+            input_content = InputTextMessageContent(message_text=f'<span class="tg-spoiler">{text}</span>', parse_mode="HTML")
+        await bot.answer_inline_query(
+            inline_query.id,
+            results=[
+                InlineQueryResultArticle(
+                    id="roll_result",
+                    title="🎲 Roll dices",
+                    description="Click to roll",
+                    input_message_content=input_content
+                )
+            ],
+            cache_time=1,
+            is_personal=True
+        )
+
+async def reply_pattern(message: Message, command: CommandObject, line_prefix: str, func):
+    db.add_user(message.from_user.username, message.from_user.id)
     try:
-        dices = get_dices(command.args)
-        text = ""
-        total_sum = 0
-        if len(dices) > 100:
-            await reply(message, "Go fuck yourself ❤️") # ibeletskiy really should rewrite it
-            return
-
-        for dice, signed_count in dices:
-            count = abs(signed_count)
-            if count > 100 or dice > 100 or dice <= 0:
-                await reply(message, "Go fuck yourself ❤️")
-                return
-            result = []
-            if dice != 1:
-                for i in range(count):
-                    if (db.is_magic_roll(message.from_user.username, dice)):
-                        print("magic!")
-                        mn, mx = db.get_magic_min_max(message.from_user.username, dice)
-                        if mn > mx:
-                            swap(mn, mx)
-                        act_mn = min(max(1, mn), dice)
-                        act_mx = max(min(dice, mx), 1)
-                        result.append(func(act_mn, act_mx))
-                        db.decrease_magic_rolls(message.from_user.username, dice)
-                    else:
-                        print("no magic :(")
-                        result.append(func(1, dice))
-                print(f"result is {result}")
-                text += f"{line_prefix}{count}d{dice}: {", ".join(list(map(str, result)))} = {sign(signed_count) * sum(result)}\n"
-            else:
-                result.append(count)
-                text += f"{signed_count}\n"
-            total_sum += sign(signed_count) * sum(result)
-
-        if len(dices) != 1:
-            text += "_______________________________\n"
-            text += f"Total sum = {total_sum}"
+        text = roll_text(message.from_user.username, command.args, line_prefix, func)
         await reply(message, text)
     except Exception as e:
         await reply(message, f"An error occurred. Please make sure you provided the details in the correct format")
@@ -131,19 +161,19 @@ async def roll_pattern(message: Message, command: CommandObject, line_prefix: st
 
 @dp.message(Command("roll"))
 async def roll_handler(message: Message, command: CommandObject):
-    await roll_pattern(message, command, "", lambda mn, mx: randint(mn, mx))
+    await reply_pattern(message, command, "", lambda mn, mx: randint(mn, mx))
 
 @dp.message(Command("roll_a"))
 async def roll_a_handler(message: Message, command: CommandObject):
-    await roll_pattern(message, command, "max ", lambda mn, mx: max(randint(mn, mx), randint(mn, mx)))
+    await reply_pattern(message, command, "max ", lambda mn, mx: max(randint(mn, mx), randint(mn, mx)))
 
 @dp.message(Command("roll_d"))
 async def roll_d_handler(message: Message, command: CommandObject):
-    await roll_pattern(message, command, "min ", lambda mn, mx: min(randint(mn, mx), randint(mn, mx)))
+    await reply_pattern(message, command, "min ", lambda mn, mx: min(randint(mn, mx), randint(mn, mx)))
 
 @dp.message(Command("set_delete_time"))
 async def set_delete_time_handler(message: Message, command: CommandObject):
-    db.add_user(message.from_user.username)
+    db.add_user(message.from_user.username, message.from_user.id)
     try:
         time = int(command.args)
         db.set_delete_time(message.from_user.username, time)
@@ -181,11 +211,13 @@ def revoke_magic(username):
 
 @dp.message(Command("give_me_magic")) 
 async def give_me_magic(message: Message, command: CommandObject):
-    db.add_user(message.from_user.username)
+    db.add_user(message.from_user.username, message.from_user.id)
     if db.is_password(command.args):
         access_time = db.get_password_time(command.args)
-        print(datetime.now(pytz.utc))
-        print(dateparser.parse(access_time, settings={'RELATIVE_BASE': datetime.now(pytz.utc), 'PREFER_DATES_FROM': 'future'}))
+        for name in MAGIC_HANDLERS:
+            if name == message.from_user.username:
+                continue
+            await bot.send_message(chat_id=db.get_user_id(name), text=f"{message.from_user.username} used magic for {access_time}")
         scheduler.add_job(revoke_magic,
             trigger='date',
             run_date=dateparser.parse(access_time, settings={'RELATIVE_BASE': datetime.now(pytz.utc), 'PREFER_DATES_FROM': 'future'}),
@@ -197,15 +229,13 @@ async def give_me_magic(message: Message, command: CommandObject):
 
 @dp.message(Command("magic_keys"))
 async def magic_keys(message: Message, command: CommandObject):
-    db.add_user(message.from_user.username)
+    db.add_user(message.from_user.username, message.from_user.id)
     time = command.args
     if not time:
         time = "1d"
     if message.from_user.username in MAGIC_HANDLERS:
         new_password = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(12))
         check_time = dateparser.parse(time, settings={'RELATIVE_BASE': datetime.now(pytz.utc), 'PREFER_DATES_FROM': 'future'})
-        print(datetime.now(pytz.utc))
-        print(check_time)
         if check_time:
             db.add_password(new_password, time)
             await reply(message, new_password)
