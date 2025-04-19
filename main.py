@@ -115,38 +115,52 @@ async def command_start_handler(message: Message):
 
 def roll_text(username: str, args: str, line_prefix: str = "", func=lambda mn, mx: randint(mn, mx)):
     sign = lambda x: -1 if x < 0 else 1 if x > 0 else 0 
-    dices = get_dices(args)
+    total_line = "_______________________________\n"
+    divide_line = "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _\n";
+
+    sentences = args.split(',')
     text = ""
-    total_sum = 0
-    if len(dices) > 100:
-        return "Go fuck yourself ❤️"
+    total_result = []
+    last_dices_count = 0
 
-    for dice, signed_count in dices:
-        count = abs(signed_count)
-        if count > 100 or dice > 100 or dice <= 0:
-            return "Go fuck yourself ❤️" #it still needs to be rewrited 
-        result = []
-        if dice != 1:
-            for i in range(count):
-                if (db.is_magic_roll(username, dice)):
-                    mn, mx = db.get_magic_min_max(username, dice)
-                    if mn > mx:
-                        swap(mn, mx)
-                    act_mn = min(max(1, mn), dice)
-                    act_mx = max(min(dice, mx), 1)
-                    result.append(func(act_mn, act_mx))
-                    db.decrease_magic_rolls(username, dice)
-                else:
-                    result.append(func(1, dice))
-            text += f"{line_prefix}{count}d{dice}: {", ".join(list(map(str, result)))} = {sign(signed_count) * sum(result)}\n"
-        else:
-            result.append(count)
-            text += f"{signed_count}\n"
-        total_sum += sign(signed_count) * sum(result)
+    for i in range(len(sentences)):
+        dices = get_dices(sentences[i])
+        last_dices_count = len(dices)
+        total_result.append(0)
 
-    if len(dices) != 1:
-        text += "_______________________________\n"
-        text += f"Total sum = {total_sum}"
+        if i != 0:
+            text += divide_line
+
+        if len(dices) > 100:
+            return "Go fuck yourself ❤️"
+
+        for dice, signed_count in dices:
+            count = abs(signed_count)
+            if count > 100 or dice > 100 or dice <= 0:
+                return "Go fuck yourself ❤️" #it still needs to be rewrited 
+            result = []
+            if dice != 1:
+                for i in range(count):
+                    if (db.is_magic_roll(username, dice)):
+                        mn, mx = db.get_magic_min_max(username, dice)
+                        if mn > mx:
+                            swap(mn, mx)
+                        act_mn = min(max(1, mn), dice)
+                        act_mx = max(min(dice, mx), 1)
+                        result.append(func(act_mn, act_mx))
+                        db.decrease_magic_rolls(username, dice)
+                    else:
+                        result.append(func(1, dice))
+                text += f"{line_prefix}{count}d{dice}: {", ".join(list(map(str, result)))} = {sign(signed_count) * sum(result)}\n"
+            else:
+                result.append(count)
+                text += f"{signed_count}\n"
+            total_result[-1] += sign(signed_count) * sum(result)
+
+    if len(total_result) > 1 or last_dices_count > 1:
+        text += total_line
+        total_result_str = ", ".join(str(x) for x in total_result)
+        text += f"Total result = {total_result_str}"
 
     return text
 
@@ -157,7 +171,7 @@ async def inline_pattern(inline_query: InlineQuery):
     if query.lower().startswith("roll"):
         try:
             args = query[len(query.split()[0]):].strip()
-            username = inline_query.from_user.username or "unkown_user"
+            username = inline_query.from_user.username or "unknown_user"
             user_id = inline_query.from_user.id
             db.add_user(username, user_id)
             text = roll_text(username, args)
