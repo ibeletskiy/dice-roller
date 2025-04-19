@@ -240,7 +240,7 @@ async def set_delete_time_handler(message: Message, command: CommandObject):
     except Exception as e:
         await reply(message, "An error occurred. Please make sure you provided the details in the correct format")
 
-@dp.message(Command("magic_set_dice"))
+@dp.message(Command("magic_set_dice", "msd"))
 async def magic_set_dice(message: Message, command: CommandObject):
     if db.is_master(message.from_user.username):
         values = command.args.split()
