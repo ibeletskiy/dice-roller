@@ -243,6 +243,9 @@ async def set_delete_time_handler(message: Message, command: CommandObject):
     except Exception as e:
         await reply(message, "An error occurred. Please make sure you provided the details in the correct format")
 
+
+# -------------------------------------------- Magic part ----------------------------------------------------
+
 @dp.message(Command("magic_set_dice", "msd"))
 async def magic_set_dice(message: Message, command: CommandObject):
     if db.is_master(message.from_user.username):
@@ -255,10 +258,35 @@ async def magic_set_dice(message: Message, command: CommandObject):
             count = 1
         else:
             user, dice, mn, mx, count = values
+        if mn > mx:
+            await reply(message, "no Abracadabra shiz")
+            return
         db.set_magic_rolls(user, dice, mn, mx, count)
         await reply(message, "Abracadabra")
 
-@dp.message(Command("magic_clear"))
+@dp.message(Command("magic_info"))
+async def magic_info(message: Message, command: CommandObject):
+    if db.is_master(message.from_user.username):
+        values = command.args.split()
+        if len(values) != 1:
+            await reply(message, "There is not right amount of arguments (format: username)")
+            return
+        user = values[0]
+        info = db.get_magic_info(user)
+        if (info):
+            result = f"{user} info:"
+            last = -1
+            for dice, mn, mx, count in info:
+                if dice != last:
+                    last = dice
+                    result += f'\n\nd{dice}:\n'
+                result += f'    [{mn}, {mx}] x {count}\n'
+            await reply(message, result)
+        else:
+            await reply(message, f'no magic on user {user}')
+
+
+@dp.message(Command("magic_clear, mc"))
 async def magic_clear(message: Message, command: CommandObject):
     if db.is_master(message.from_user.username):
         values = command.args.split()
@@ -280,7 +308,9 @@ async def give_me_magic(message: Message, command: CommandObject):
         for name in MAGIC_HANDLERS:
             if name == message.from_user.username:
                 continue
-            await bot.send_message(chat_id=db.get_user_id(name), text=f"{message.from_user.username} used magic for {access_time}")
+            id = db.get_user_id(name)
+            if id:
+                await bot.send_message(chat_id=id, text=f"{message.from_user.username} used magic for {access_time}")
         scheduler.add_job(revoke_magic,
             trigger='date',
             run_date=dateparser.parse(access_time, settings={'RELATIVE_BASE': datetime.now(pytz.utc), 'PREFER_DATES_FROM': 'future'}),

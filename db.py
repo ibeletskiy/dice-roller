@@ -24,11 +24,12 @@ class DataBase:
             magic_used BIT DEFAULT 0
         )''')
         c.execute('''CREATE TABLE IF NOT EXISTS magic_rolls (
-            username TEXT, dice INTEGER,
+            roll_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            dice INTEGER,
             mn INTEGER,
             mx INTEGER,
-            count INTEGER,
-            PRIMARY KEY (username, dice)
+            count INTEGER
         )''')
         conn.commit()
         conn.close()
@@ -114,15 +115,20 @@ class DataBase:
         c = conn.cursor()
         c.execute("UPDATE magic SET magic_used = ? WHERE username = ?", (1, username))
 
-        c.execute("SELECT 1 FROM magic_rolls WHERE username = ? AND dice = ?", (username, dice))
-        if c.fetchone():
-            c.execute('''UPDATE magic_rolls SET mn = ?, mx = ?, count = ? 
-                WHERE username = ? and dice = ?''', (mn, mx, count, username, dice))
-        else:
-            c.execute('''INSERT INTO magic_rolls (username, dice, mn, mx, count) 
+        c.execute('''INSERT INTO magic_rolls (username, dice, mn, mx, count) 
                     VALUES (?, ?, ?, ?, ?)''', (username, dice, mn, mx, count))
         conn.commit()
         conn.close()
+
+    def get_magic_info(self, username):
+        conn = sqlite3.connect(PATH)
+        c = conn.cursor()
+        c.execute("SELECT magic_used FROM magic WHERE username = ?", (username,))
+        result = c.fetchone()
+        if result and result[0]:
+            c.execute("select dice, mn, mx, count from   magic_rolls where username = ? order by dice, roll_id", (username,))
+            return c.fetchall()
+        return None
 
     def is_magic_user(self, username):
         conn = sqlite3.connect(PATH)
@@ -162,12 +168,22 @@ class DataBase:
         c.execute("SELECT magic_used FROM magic WHERE username = ?", (username,))
         result = c.fetchone()
         if result and result[0]:
-            c.execute('''UPDATE magic_rolls SET count = count - 1 
-                WHERE username = ? AND dice = ? AND count > 0''',(username, dice))
+            c.execute("select roll_id from magic_rolls where username = ? and dice = ? order by roll_id limit 1", (username, dice))
+            id = c.fetchone()[0]
 
-            c.execute("SELECT count FROM magic_rolls WHERE username = ? AND dice = ?", (username, dice))
+            c.execute('''UPDATE magic_rolls SET count = count - 1 
+                WHERE roll_id = ? AND count > 0''', (id,))
+
+            c.execute("SELECT count FROM magic_rolls WHERE roll_id = ?", (id,))
             updated_count = c.fetchone()
+
             if updated_count and updated_count[0] == 0:
+                c.execute("delete from magic_rolls where roll_id = ?", (id,))
+
+            c.execute("select count(*) as last from magic_rolls where username = ?", (username,))
+            last = c.fetchone()
+
+            if last and last[0] == 0:
                 c.execute("UPDATE magic SET magic_used = 0 WHERE username = ?", (username,))
         conn.commit()
         conn.close()
