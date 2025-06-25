@@ -33,8 +33,6 @@ db = DataBase()
 
 scheduler = AsyncIOScheduler(timezone=pytz.utc)
 
-rnd = secrets.SystemRandom()
-
 @dp.message(Command("help"))
 async def help_handler(message: Message):
     username = message.from_user.username
@@ -54,6 +52,7 @@ async def help_handler(message: Message):
 \n\n<b>🧙 Магия:</b>
 /magic_set_dice &lt;user&gt; &lt;dice&gt; &lt;min&gt; &lt;max&gt; &lt;count&gt; — задать магию пользователю
 /magic_clear &lt;user&gt; dice1 dice2 ... — очистить магические кости
+/magic_info &lt;user&gt — информации о магии
 /give_me_magic &lt;ключ&gt; — получить временный доступ к магии
 /magic_keys [время] — сгенерировать ключ на время
 """
@@ -116,7 +115,7 @@ async def command_start_handler(message: Message):
     db.add_user(message.from_user.username, message.from_user.id)
     await reply(message, "Welcome to DnD Dice Roller Bot!")
 
-def roll_text(username: str, args: str, line_prefix: str = "", func=lambda mn, mx: rnd.randint(mn, mx)):
+def roll_text(username: str, args: str, line_prefix: str = "", func=lambda mn, mx: randint(mn, mx)):
     sign = lambda x: -1 if x < 0 else 1 if x > 0 else 0 
     total_line = "_______________________________\n"
     divide_line = "_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _\n";
@@ -220,19 +219,19 @@ async def hidden_pattern(message: Message, command: CommandObject, line_prefix: 
 
 @dp.message(Command("roll_h"))
 async def roll_h_handler(message: Message, command: CommandObject):
-    await hidden_pattern(message, command, "", lambda mn, mx: rnd.randint(mn, mx))
+    await hidden_pattern(message, command, "", lambda mn, mx: randint(mn, mx))
 
 @dp.message(Command("roll"))
 async def roll_handler(message: Message, command: CommandObject):
-    await reply_pattern(message, command, "", lambda mn, mx: rnd.randint(mn, mx))
+    await reply_pattern(message, command, "", lambda mn, mx: randint(mn, mx))
 
 @dp.message(Command("roll_a"))
 async def roll_a_handler(message: Message, command: CommandObject):
-    await reply_pattern(message, command, "max ", lambda mn, mx: max(rnd.randint(mn, mx), rnd.randint(mn, mx)))
+    await reply_pattern(message, command, "max ", lambda mn, mx: max(randint(mn, mx), randint(mn, mx)))
 
 @dp.message(Command("roll_d"))
 async def roll_d_handler(message: Message, command: CommandObject):
-    await reply_pattern(message, command, "min ", lambda mn, mx: min(rnd.randint(mn, mx), rnd.randint(mn, mx)))
+    await reply_pattern(message, command, "min ", lambda mn, mx: min(randint(mn, mx), randint(mn, mx)))
 
 @dp.message(Command("set_delete_time"))
 async def set_delete_time_handler(message: Message, command: CommandObject):
