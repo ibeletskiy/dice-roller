@@ -285,7 +285,7 @@ async def magic_info(message: Message, command: CommandObject):
             await reply(message, f'no magic on user {user}')
 
 
-@dp.message(Command("magic_clear, mc"))
+@dp.message(Command("magic_clear", "mc"))
 async def magic_clear(message: Message, command: CommandObject):
     if db.is_master(message.from_user.username):
         values = command.args.split()
