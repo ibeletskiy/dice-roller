@@ -253,10 +253,13 @@ async def magic_set_dice(message: Message, command: CommandObject):
             await reply(message, "There is not right amount of arguments (format: username, dice, min, max, count)")
             return
         if (len(values) == 4):
-            user, dice, mn, mx = values
+            print
+            user = values[0]
+            dice, mn, mx = list(map(int, values[1:]))
             count = 1
         else:
-            user, dice, mn, mx, count = values
+            user = values[0]
+            dice, mn, mx, count = list(map(int, values[1:]))
         if mn > mx:
             await reply(message, "no Abracadabra shiz")
             return
