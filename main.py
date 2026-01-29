@@ -146,7 +146,7 @@ def roll_text(username: str, args: str, line_prefix: str = "", func=lambda mn, m
                     if (db.is_magic_roll(username, dice)):
                         mn, mx = db.get_magic_min_max(username, dice)
                         if mn > mx:
-                            swap(mn, mx)
+                            mn, mx = mx, mn
                         act_mn = min(max(1, mn), dice)
                         act_mx = max(min(dice, mx), 1)
                         result.append(func(act_mn, act_mx))
@@ -245,7 +245,7 @@ async def set_delete_time_handler(message: Message, command: CommandObject):
 
 # -------------------------------------------- Magic part ----------------------------------------------------
 
-@dp.message(Command("magic_set_dice", "msd"))
+@dp.message(Command("magic_set_dice", "msd", "set_dice"))
 async def magic_set_dice(message: Message, command: CommandObject):
     if db.is_master(message.from_user.username):
         values = command.args.split()
@@ -266,7 +266,7 @@ async def magic_set_dice(message: Message, command: CommandObject):
         db.set_magic_rolls(user, dice, mn, mx, count)
         await reply(message, "Abracadabra")
 
-@dp.message(Command("magic_info"))
+@dp.message(Command("magic_info", "info"))
 async def magic_info(message: Message, command: CommandObject):
     if db.is_master(message.from_user.username):
         values = command.args.split()
@@ -287,8 +287,7 @@ async def magic_info(message: Message, command: CommandObject):
         else:
             await reply(message, f'no magic on user {user}')
 
-
-@dp.message(Command("magic_clear", "mc"))
+@dp.message(Command("magic_clear", "mc", "clear"))
 async def magic_clear(message: Message, command: CommandObject):
     if db.is_master(message.from_user.username):
         values = command.args.split()
@@ -322,7 +321,7 @@ async def give_me_magic(message: Message, command: CommandObject):
         db.delete_password(command.args)
         await reply(message, f"Magic is given to you for {access_time}")
 
-@dp.message(Command("magic_keys"))
+@dp.message(Command("magic_keys", "keys"))
 async def magic_keys(message: Message, command: CommandObject):
     db.add_user(message.from_user.username, message.from_user.id)
     time = command.args
