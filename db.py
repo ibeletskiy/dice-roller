@@ -1,12 +1,19 @@
+import os
 import sqlite3
 
-PATH = '/home/ibeletskiy/dice-roller/dnd_bot.db'
-#PATH = '/Users/iabeletsky/Programming/dice-roller/dnd_bot.db'
+DB_PATH = os.getenv("DB_PATH", "dnd_bot.db")
+
+
+def connect():
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+    return sqlite3.connect(DB_PATH)
 
 class DataBase:
 
     def __init__(self):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute('''CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
@@ -35,7 +42,7 @@ class DataBase:
         conn.close()
 
     def add_user(self, username, user_id):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("INSERT OR IGNORE INTO users (username, user_id, delete_time) VALUES (?, ?, ?)", (username, user_id, 60))
         c.execute("INSERT OR IGNORE INTO magic (username, magic_used) VALUES (?, ?)", (username, 0))
@@ -43,14 +50,14 @@ class DataBase:
         conn.close()
 
     def set_master_role(self, username, value):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("UPDATE users SET is_master = ? WHERE username = ?", (value, username))
         conn.commit()
         conn.close()
 
     def is_master(self, username):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("SELECT is_master FROM users WHERE username = ?", (username,))
         result = c.fetchone()
@@ -58,14 +65,14 @@ class DataBase:
         return result[0] if result else False
 
     def set_delete_time(self, username, time):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("UPDATE users SET delete_time = ? WHERE username = ?", (time, username))
         conn.commit()
         conn.close()
 
     def get_delete_time(self, username):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("SELECT delete_time FROM users WHERE username = ?", (username,))
         time = c.fetchone()
@@ -73,7 +80,7 @@ class DataBase:
         return time[0] if time else 60
 
     def get_user_id(self, username):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("SELECT user_id FROM users WHERE username = ?", (username,))
         uid = c.fetchone()
@@ -81,14 +88,14 @@ class DataBase:
         return uid[0] if uid else None
 
     def add_password(self, password, time):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("INSERT INTO active_passwords (password, access_time) VALUES (?, ?)", (password, time))
         conn.commit()
         conn.close()
 
     def is_password(self, password):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("SELECT 1 FROM active_passwords WHERE password = ?", (password,))
         ans = c.fetchone() is not None
@@ -96,7 +103,7 @@ class DataBase:
         return ans
 
     def get_password_time(self, password):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("SELECT access_time FROM active_passwords WHERE password = ?", (password,))
         result = c.fetchone()
@@ -104,14 +111,14 @@ class DataBase:
         return result[0]
 
     def delete_password(self, password):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("DELETE FROM active_passwords WHERE password = ?", (password,))
         conn.commit()
         conn.close()
 
     def set_magic_rolls(self, username, dice, mn, mx, count=1):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("UPDATE magic SET magic_used = ? WHERE username = ?", (1, username))
 
@@ -121,7 +128,7 @@ class DataBase:
         conn.close()
 
     def get_magic_info(self, username):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("SELECT magic_used FROM magic WHERE username = ?", (username,))
         result = c.fetchone()
@@ -131,14 +138,14 @@ class DataBase:
         return None
 
     def is_magic_user(self, username):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("SELECT magic_used FROM magic WHERE username = ?", (username,))
         result = c.fetchone()
         return result[0]
 
     def is_magic_roll(self, username, dice):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("SELECT magic_used FROM magic WHERE username = ?", (username,))
         result = c.fetchone()
@@ -149,7 +156,7 @@ class DataBase:
         return False
 
     def get_magic_min_max(self, username, dice):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         c.execute("SELECT magic_used FROM magic WHERE username = ?", (username,))
         result = c.fetchone()
@@ -162,7 +169,7 @@ class DataBase:
         return None
 
     def decrease_magic_rolls(self, username, dice):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
 
         c.execute("SELECT magic_used FROM magic WHERE username = ?", (username,))
@@ -189,7 +196,7 @@ class DataBase:
         conn.close()
 
     def clear_magic(self, username, dice=[]):
-        conn = sqlite3.connect(PATH)
+        conn = connect()
         c = conn.cursor()
         if len(dice) == 0:
             c.execute("DELETE FROM magic_rolls WHERE username = ?", (username,))

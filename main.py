@@ -22,8 +22,23 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime, timedelta
 from random import randint
 
-from config import API_TOKEN
-from config import MAGIC_HANDLERS
+try:
+    from config import API_TOKEN as CONFIG_API_TOKEN
+    from config import MAGIC_HANDLERS as CONFIG_MAGIC_HANDLERS
+except ImportError:
+    CONFIG_API_TOKEN = None
+    CONFIG_MAGIC_HANDLERS = []
+
+
+def parse_magic_handlers(value: str):
+    return [handler.strip().lstrip("@") for handler in value.split(",") if handler.strip()]
+
+
+API_TOKEN = os.getenv("API_TOKEN") or CONFIG_API_TOKEN
+MAGIC_HANDLERS = parse_magic_handlers(os.getenv("MAGIC_HANDLERS", "")) or CONFIG_MAGIC_HANDLERS
+
+if not API_TOKEN:
+    raise RuntimeError("API_TOKEN is required. Set it in .env or config.py.")
 
 dp = Dispatcher()
 
