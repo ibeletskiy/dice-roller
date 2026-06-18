@@ -50,6 +50,7 @@ bot = Bot(token=API_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTM
 db = DataBase()
 
 scheduler = AsyncIOScheduler(timezone=pytz.utc)
+pending_character_uploads = set()
 
 
 def normalize_username(username: str):
@@ -350,10 +351,10 @@ async def help_handler(message: Message):
 /groups — показать мои группы
 
 <b>Персонажи:</b>
-Отправьте JSON-файл в личку боту — добавить персонажа
-/characters — показать моих персонажей
-/character_use &lt;character_id&gt; [group] — запросить добавление персонажа в группу
-/group_characters [group] — показать персонажей группы
+/add_char — добавить персонажа из JSON-файла
+/chars — показать моих персонажей
+/char_use &lt;character_id&gt; [group] — запросить добавление персонажа в группу
+/group_chars [group] — показать персонажей группы
 
 <b>Боевка:</b>
 /start_battle — начать настройку битвы
@@ -772,13 +773,13 @@ async def group_remove_master_handler(message: Message, command: CommandObject):
     await reply(message, f"@{target_username} is no longer a group master.")
 
 
-@dp.message(Command("characters"))
+@dp.message(Command("characters", "chars"))
 async def characters_handler(message: Message):
     username = message.from_user.username
     db.add_user(username, message.from_user.id)
     characters = db.get_user_characters(username)
     if not characters:
-        await reply(message, "You have no characters. Send a character JSON file to this private chat.")
+        await reply(message, "You have no characters. Use /add_char in private messages with the bot.")
         return
 
     lines = ["Your characters:"]
@@ -787,7 +788,20 @@ async def characters_handler(message: Message):
     await reply(message, "\n".join(lines))
 
 
-@dp.message(Command("group_characters"))
+@dp.message(Command("add_character", "add_char"))
+async def add_character_handler(message: Message):
+    username = message.from_user.username
+    db.add_user(username, message.from_user.id)
+
+    if message.chat.type != "private":
+        await reply(message, "Use /add_char in private messages with the bot.")
+        return
+
+    pending_character_uploads.add(username)
+    await reply(message, "Send a character JSON file.")
+
+
+@dp.message(Command("group_characters", "group_chars"))
 async def group_characters_handler(message: Message, command: CommandObject):
     group_ref = (command.args or "").strip() or None
     group = await require_group_context(message, group_ref)
@@ -810,14 +824,14 @@ async def group_characters_handler(message: Message, command: CommandObject):
     await reply(message, "\n".join(lines))
 
 
-@dp.message(Command("character_use"))
+@dp.message(Command("character_use", "char_use"))
 async def character_use_handler(message: Message, command: CommandObject):
     username = message.from_user.username
     db.add_user(username, message.from_user.id)
 
     values = (command.args or "").split()
     if not values:
-        await reply(message, "Usage: /character_use <character_id> [group_name_or_id]")
+        await reply(message, "Usage: /char_use <character_id> [group_name_or_id]")
         return
 
     try:
@@ -936,6 +950,10 @@ async def character_document_handler(message: Message):
     username = message.from_user.username
     db.add_user(username, message.from_user.id)
 
+    if username not in pending_character_uploads:
+        await reply(message, "Use /add_char before sending a character JSON file.")
+        return
+
     document = message.document
     if not document.file_name or not document.file_name.lower().endswith(".json"):
         await reply(message, "Send a .json character file.")
@@ -954,11 +972,12 @@ async def character_document_handler(message: Message):
         await reply(message, f"Could not parse character JSON: {e}")
         return
 
+    pending_character_uploads.discard(username)
     character_id = db.add_character(username, character_name, payload)
     await reply(
         message,
-        f'Character "{character_name}" was added. ID: {character_id}\n'
-        f'Use /character_use {character_id} <group> to request adding it to a game.'
+        f'Character "{character_name}" was registered.\n'
+        f'Use /char_use {character_id} <group> to request adding it to a game.'
     )
 
 
