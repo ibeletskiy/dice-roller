@@ -129,15 +129,14 @@ def active_battle_for_message(message: Message):
 
 
 def battle_status_text(battle, for_master=False):
-    battle_id, _, _, _, _, round_number, _, _ = battle
+    battle_id = battle[0]
     entities = db.get_battle_entities(battle_id)
     all_rolled = bool(entities) and all(entity[8] for entity in entities)
     if for_master and all_rolled:
         entities = db.get_battle_entities(battle_id, rolled_first=True)
 
-    title = f"Battle #{battle_id}, round {round_number}"
     headers = f"{'Name':<24} {'Init':<8} {'Base':<10} {'Round':<7}"
-    lines = [title, "", headers]
+    lines = [headers]
     for entity in entities:
         _, _, name, _, base_formula, current_modifier, next_modifier, initiative_value, has_rolled = entity
         escaped_name = html.escape(name)[:24]
@@ -158,6 +157,10 @@ def battle_status_text(battle, for_master=False):
 
 
 def battle_roll_keyboard(battle_id):
+    entities = db.get_battle_entities(battle_id)
+    if entities and all(entity[8] for entity in entities):
+        return None
+
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="Бросить на инициативу", callback_data=f"battle_roll:{battle_id}")
     ]])
@@ -191,7 +194,7 @@ async def refresh_battle_messages(battle_id):
 def selection_text(battle, group_name):
     battle_id = battle[0]
     entities = db.get_battle_entities(battle_id)
-    lines = [f'Battle setup for "{html.escape(group_name)}"', "", "Selected:"]
+    lines = [f'"{html.escape(group_name)}"', "", "Selected:"]
     if entities:
         for entity in entities:
             _, _, name, owner, *_ = entity
@@ -339,8 +342,8 @@ async def help_handler(message: Message):
 /help — показать эту справку
     
 <b>Группы:</b>
-/group_create &lt;name&gt; — создать группу
-/group_invite &lt;user&gt; [group] — пригласить игрока
+/group_create &lt;name&gt; — создать группу, в чате сразу делает ее группой по умолчанию
+/group_invite &lt;user&gt; [group] — пригласить игрока; в чате группы можно без [group]
 /group_set_default &lt;group&gt; — сделать группу группой по умолчанию в этом чате
 /group_add_master &lt;user&gt; [group] — добавить мастера
 /group_remove_master &lt;user&gt; [group] — удалить мастера
@@ -421,13 +424,13 @@ def invert_roll_details(details):
     return result
 
 
-def bold_selected(first_value, second_value, selected_value):
+def underline_selected(first_value, second_value, selected_value):
     first = str(first_value)
     second = str(second_value)
     if first_value == selected_value:
-        first = f"<b>{first}</b>"
-    if second_value == selected_value:
-        second = f"<b>{second}</b>"
+        first = f"<u>{first}</u>"
+    elif second_value == selected_value:
+        second = f"<u>{second}</u>"
     return first, second
 
 
@@ -507,7 +510,7 @@ class RollParser:
         second = RollParser(self.username, inner_text, self.func).parse().value
         is_advantage = op in ADVANTAGE_LETTERS
         selected = max(first, second) if is_advantage else min(first, second)
-        first_text, second_text = bold_selected(first, second, selected)
+        first_text, second_text = underline_selected(first, second, selected)
         formula = self.text[start:self.pos]
         details = [f"{formula}: {first_text}, {second_text} = {selected}"]
         return RollResult(selected, details)
@@ -604,7 +607,12 @@ async def group_create_handler(message: Message, command: CommandObject):
         await reply(message, f'Group "{name}" already exists.')
         return
 
-    await reply(message, f'Group "{name}" created. You are its master. ID: {group_id}')
+    if message.chat.type != "private":
+        db.set_default_group(message.chat.id, group_id)
+        await reply(message, f'Group "{name}" created. You are its master.\nThis group is now default for this chat.')
+        return
+
+    await reply(message, f'Group "{name}" created. You are its master.')
 
 
 @dp.message(Command("groups"))
