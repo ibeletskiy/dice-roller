@@ -9,4 +9,8 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
+eval "$(ssh-agent -s)"
+ssh-add /root/.ssh/github_key
+git pull
+
 docker compose up -d --build dice-roller-bot
